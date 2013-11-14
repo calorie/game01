@@ -26,20 +26,11 @@ function game.enterMenuScene()
     display.replaceScene(require("scenes.MenuScene").new(), "fade", 0.6, display.COLOR_WHITE)
 end
 
-function game.enterMoreGamesScene()
-    display.replaceScene(require("scenes.MoreGamesScene").new(), "fade", 0.6, display.COLOR_WHITE)
-end
-
 function game.enterChooseLevelScene()
     display.replaceScene(require("scenes.ChooseLevelScene").new(), "fade", 0.6, display.COLOR_WHITE)
 end
 
-function game.playLevel(levelIndex)
-    local PlayLevelScene = require("scenes.PlayLevelScene")
-    display.replaceScene(PlayLevelScene.new(levelIndex), "fade", 0.6, display.COLOR_WHITE)
-end
-
-function game.playWall()
+function game.playWall(levelIndex)
     local PlayWallScene = require("scenes.PlayWallScene")
-    display.replaceScene(PlayWallScene.new(), "fade", 0.6, display.COLOR_WHITE)
+    display.replaceScene(PlayWallScene.new(levelIndex), "fade", 0.6, display.COLOR_WHITE)
 end

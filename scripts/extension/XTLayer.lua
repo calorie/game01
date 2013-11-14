@@ -2,7 +2,7 @@
 require "socket"
 local scheduler = require("framework.scheduler")
 
-XTLayer = class("XTLayer", CCLayerExtend)
+local XTLayer = class("XTLayer", CCLayerExtend)
 XTLayer.__index = XTLayer
 
 local _xtSwipeThreshold  = 10
@@ -13,9 +13,6 @@ local _xtTouchStartTime  = 0
 local _xtTouchStartX     = 0
 local _xtTouchStartY     = 0
 local function fabs(n) return math.abs(n) end
-
-function XTLayer:notXTLayer()
-end
 
 function XTLayer:millisecondNow()
     return socket.gettime() * 1000

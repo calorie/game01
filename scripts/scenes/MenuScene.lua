@@ -7,9 +7,6 @@ function MenuScene:ctor()
     self.bg = display.newSprite("#MenuSceneBg.png", display.cx, display.cy)
     self:addChild(self.bg)
 
-    -- self.adBar = require("views.AdBar").new()
-    -- self:addChild(self.adBar)
-
     -- create menu
     local BubbleButton = require("views.BubbleButton")
     self.moreGamesButton = BubbleButton.new({
@@ -36,8 +33,7 @@ function MenuScene:ctor()
             self.layer:setKeypadEnabled(false)
         end,
         listener = function()
-            -- game.enterChooseLevelScene()
-            game.playWall()
+            game.enterChooseLevelScene()
         end,
     })
 

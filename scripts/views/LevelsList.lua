@@ -13,7 +13,7 @@ function LevelsList:ctor(rect)
     local rows, cols = 4, 4
     if display.height > 1000 then rows = rows + 1 end
 
-    local Levels = require("data.Levels")
+    local Levels = require("data.WorldLevels")
     local numPages = math.ceil(Levels.numLevels() / (rows * cols))
     local levelIndex = 1
 

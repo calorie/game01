@@ -1,24 +1,21 @@
 
 local EventProtocol = require("framework.api.EventProtocol")
-local scheduler = require("framework.scheduler")
+local scheduler     = require("framework.scheduler")
 
 local Player = class("Player", function()
     return display.newLayer()
 end)
-Player.player = nil
 
-local GRAVITY         = -200
-local PLAYER_MASS     = 100
-local PLAYER_RADIUS   = 46
-local COIN_FRICTION   = 0.8
-local COIN_ELASTICITY = 0.8
-local WALL_THICKNESS  = 64
-local WALL_FRICTION   = 1.0
-local WALL_ELASTICITY = 0
-local PLAYER_FRAME_WIDTH = 105
-local PLAYER_FRAME_HEIGHT = 95
+local GRAVITY                 = -200
+local PLAYER_MASS             = 100
+local PLAYER_RADIUS           = 46
+local PLAYER_FRAME_WIDTH      = 105
+local PLAYER_HALF_FRAME_WIDTH = PLAYER_FRAME_WIDTH / 2
+local PLAYER_FRAME_HEIGHT     = 95
+Player.PLAYER_SPEED           = 3
+Player.PLAYER_COLLISION_TYPE  = 1
 
-function Player:ctor()
+function Player:ctor(currentWorld)
     EventProtocol.extend(self)
 
     -- create touch layer
@@ -27,87 +24,106 @@ function Player:ctor()
     end)
     self:setNodeEventEnabled(true)
 
+    self.sprite = nil
+
     -- create batch node
     self.batch = display.newBatchNode(GAME_TEXTURE_IMAGE_FILENAME)
     self:addChild(self.batch)
 
-    -- create physics world
-    self.world = CCPhysicsWorld:create(0, GRAVITY)
-    -- add world to scene
-    self:addChild(self.world)
-
-    local bottomWallSprite = display.newSprite("#AdBar.png")
-    self.batch:addChild(bottomWallSprite)
-    local bottomWallBody = self.world:createBoxBody(0, display.width, WALL_THICKNESS)
-    bottomWallBody:setFriction(WALL_FRICTION)
-    bottomWallBody:setElasticity(WALL_ELASTICITY)
-    bottomWallBody:bind(bottomWallSprite)
-    bottomWallBody:setPosition(display.cx, display.bottom + WALL_THICKNESS / 2)
+    self.world = currentWorld
 end
 
-function Player:createPlayer(x, y)
+function Player:getPlayer()
+    return self.sprite
+end
+
+function Player:createSprite(x, y)
     -- add sprite to scene
     local texturePlayer = CCTextureCache:sharedTextureCache():addImage("dog.png")
-    local rect = CCRectMake(0, 0, PLAYER_FRAME_WIDTH, PLAYER_FRAME_HEIGHT)
+    local rect = CCRect(0, 0, PLAYER_FRAME_WIDTH, PLAYER_FRAME_HEIGHT)
     local frame0 = CCSpriteFrame:createWithTexture(texturePlayer, rect)
-    rect = CCRectMake(PLAYER_FRAME_WIDTH, 0, PLAYER_FRAME_WIDTH, PLAYER_FRAME_HEIGHT)
+    rect = CCRect(PLAYER_FRAME_WIDTH, 0, PLAYER_FRAME_WIDTH, PLAYER_FRAME_HEIGHT)
     local frame1 = CCSpriteFrame:createWithTexture(texturePlayer, rect)
-
-    local spritePlayer = CCSprite:createWithSpriteFrame(frame0)
-
     local animFrames = CCArray:create()
-
     animFrames:addObject(frame0)
     animFrames:addObject(frame1)
-
     local animation = CCAnimation:createWithSpriteFrames(animFrames, 0.5)
-    local animate = CCAnimate:create(animation)
-    spritePlayer:runAction(CCRepeatForever:create(animate))
+
+    local spritePlayer = CCSprite:createWithSpriteFrame(frame0)
+    transition.playAnimationForever(spritePlayer, animation)
 
     -- moving player at every frame
-    local direction = 1
+    self.tickDirection = 1
+    local rightWall = CCRect(display.right, 0, 10, display.height)
+    local leftWall = CCRect(display.left - 10, 0, 10, display.height)
     local function tick()
-        if not Player.player then return end
-        if Player.player.isPaused then return end
-        if x > display.width or x < 0 then
-          direction = direction * -1
+        if not self.sprite then return end
+        if self.isPaused then return end
+        if rightWall:containsPoint(ccp(x + PLAYER_HALF_FRAME_WIDTH / 2, y)) or
+            leftWall:containsPoint(ccp(x - PLAYER_HALF_FRAME_WIDTH / 2, y)) then
+            self.tickDirection = self.tickDirection * -1
         end
-        x = x + 3 * direction
+        x = x + self.PLAYER_SPEED * self.tickDirection
 
-        Player.player:setPositionX(x)
+        self.spriteBody:setPositionX(x)
+        self.sprite:setPositionX(x)
     end
-
-    scheduler.scheduleUpdateGlobal(tick)
+    self.tickScheduler = scheduler.scheduleUpdateGlobal(tick)
 
     -- create body
-    local playerBody = self.world:createCircleBody(PLAYER_MASS, PLAYER_RADIUS)
-    -- playerBody:setFriction(COIN_FRICTION)
-    -- playerBody:setElasticity(COIN_ELASTICITY)
+    self.spriteBody = self.world:createCircleBody(PLAYER_MASS, PLAYER_RADIUS)
     -- binding sprite to body
-    playerBody:bind(spritePlayer)
+    self.spriteBody:bind(spritePlayer)
     -- set body position
-    playerBody:setPosition(x, y)
+    self.spriteBody:setPosition(x, y)
+    self.spriteBody:setCollisionType(self.PLAYER_COLLISION_TYPE)
 
     return spritePlayer
 end
 
+function Player:climb(playerX, playerY, dist)
+    self.climbing = true
+    self.isPaused = true
+    self.spriteBody:unbind()
+    playerY = playerY + dist
+    self.sprite:runAction(transition.sequence({
+        CCMoveTo:create(dist / 300, CCPoint(playerX, playerY)),
+        CCCallFunc:create(function() self.isPaused = false end),
+        CCJumpTo:create(0.5, CCPoint(playerX, playerY + 70), 100, 1),
+        CCCallFunc:create(function()
+            local x, y = self.sprite:getPosition()
+            self.spriteBody:setPosition(x, y)
+            self.spriteBody:bind(self.sprite)
+            self.climbing = false
+        end),
+    }))
+end
+
 function Player:onTouch(event, x, y)
     if event == "began" then
-        if Player.player == nil then
-            Player.player = self:createPlayer(x, y)
-            self:addChild(Player.player)
+        if self.sprite == nil then
+            self.sprite = self:createSprite(x, y)
+            self:addChild(self.sprite)
         end
+    end
+end
+
+function Player:removeAll()
+    self:setTouchEnabled(false)
+    transition.stopTarget(self.sprite)
+    self.sprite = nil
+    self:removeAllEventListeners()
+    if self.tickScheduler then
+        scheduler.unscheduleGlobal(self.tickScheduler)
     end
 end
 
 function Player:onEnter()
     self:setTouchEnabled(true)
-    self.world:start()
 end
 
 function Player:onExit()
-    Player.player = nil
-    self:removeAllEventListeners()
+    self:removeAll()
 end
 
 return Player
